@@ -245,7 +245,10 @@ fieldset { border: 0; margin: 0; padding: 0; }
   function holLabel(m, d) {
     if (!HOLIDAYS[key(m, d)] || (d > 1 && HOLIDAYS[key(m, d - 1)])) return "";
     const labels = []; for (let x = d; x <= dim(m) && HOLIDAYS[key(m, x)]; x++) labels.push(SHORT[HOLIDAYS[key(m, x)]] || HOLIDAYS[key(m, x)]);
-    return `<span class="hol-label${d + labels.length - 1 >= 28 && labels.length === 1 ? " r" : ""}">${esc(labels.join(" · "))}</span>`;
+    // Grid label for a run of holidays. Christmas Eve + Christmas shortens to "Christmas" so it clears New Year's Eve; the day panel keeps full names.
+    const RUN = { "Christmas Eve · Christmas": "Christmas" };
+    const text = RUN[labels.join(" · ")] || labels.join(" · ");
+    return `<span class="hol-label${d + labels.length - 1 >= 28 && labels.length === 1 ? " r" : ""}">${esc(text)}</span>`;
   }
   SHOW.forEach((m, ri) => {
     const r = ri + 1;
