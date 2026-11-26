@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>The Big a## Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&display=swap">
+<style>
+/* Desktop wallpaper with two widgets: the year (large) and Up next (small).
+   TechBuffalo Brand Book (Jan 2024): Dark Blue #202046 ground, Primary Blue #2E3486, Light Blue #3DE7E7. */
+:root {
+  color-scheme: dark;
+  --dark: #202046; --blue: #2E3486; --light: #3DE7E7; --white: #FFFFFF;
+  --glass: rgba(24, 24, 58, 0.58); --glass-edge: rgba(255,255,255,0.09);
+  --line: rgba(255,255,255,0.065); --line2: rgba(255,255,255,0.11);
+  --num: rgba(255,255,255,0.70); --dow: rgba(255,255,255,0.34); --muted: rgba(255,255,255,0.58);
+  --font: "Avenir Next", "Avenir LT Std", Avenir, "Nunito Sans", system-ui, sans-serif;
+  --safe-top: 24px; --safe-bottom: 24px; --icons: 0px;
+}
+:root.wallpaper { --safe-top: 56px; --safe-bottom: 96px; --icons: 230px; }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { font-family: var(--font); color: var(--white); overflow: hidden; background: var(--dark);
+  background-image:
+    radial-gradient(70% 60% at 12% 8%, rgba(46,52,134,0.95) 0%, rgba(46,52,134,0) 70%),
+    radial-gradient(55% 50% at 88% 92%, rgba(61,231,231,0.13) 0%, rgba(61,231,231,0) 70%),
+    radial-gradient(40% 35% at 70% 10%, rgba(61,231,231,0.07) 0%, rgba(61,231,231,0) 70%); }
+.bar { position: fixed; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, var(--light), var(--blue)); z-index: 5; }
+.desk { position: absolute; inset: var(--safe-top) calc(var(--icons) + max(32px, env(safe-area-inset-right, 0px))) var(--safe-bottom) max(32px, env(safe-area-inset-left, 0px));
+  display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 18px; }
+.widget { background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(8, 8, 30, 0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+  backdrop-filter: blur(22px) saturate(1.2); -webkit-backdrop-filter: blur(22px) saturate(1.2); min-width: 0; min-height: 0; }
+
+/* Year widget */
+.year { display: flex; flex-direction: column; padding: 20px 22px 16px; }
+.year-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding: 0 2px 14px; }
+h1 { margin: 0; font-weight: 800; font-size: 26px; letter-spacing: -0.2px; line-height: 1; }
+h1 .yr { color: var(--light); margin-left: 8px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; font-weight: 600; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.legend i.hol { background: repeating-linear-gradient(135deg, rgba(255,255,255,.7) 0 1.5px, rgba(255,255,255,.15) 1.5px 3px); }
+.grid { flex: 1; min-height: 0; display: grid; position: relative; }
+.mon { font-weight: 800; font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.82); align-self: start; padding-top: 6px; border-top: 1px solid var(--line2); }
+.mon.first, .cell.first-row { border-top: 0; }
+.cell { position: relative; border: 0; border-top: 1px solid var(--line2); box-shadow: inset 1px 0 0 var(--line); background: transparent; padding: 0; margin: 0;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cell:hover { background: rgba(61,231,231,0.07); }
+.cell:focus-visible { outline: 2px solid var(--light); outline-offset: -2px; }
+.cell.sel { background: rgba(61,231,231,0.10); box-shadow: inset 0 0 0 1.5px var(--light); }
+.cell.today .n { color: var(--dark); background: var(--light); border-radius: 4px; padding: 0 3px; }
+.cell.off { background: repeating-linear-gradient(135deg, rgba(255,255,255,0.055) 0 3px, transparent 3px 7px); }
+.cell .h { position: absolute; top: 4px; left: 5px; right: 4px; display: flex; justify-content: space-between; align-items: baseline; pointer-events: none; }
+.cell .n { font-size: 10px; font-weight: 700; color: var(--num); font-variant-numeric: tabular-nums; }
+.cell .d { font-size: 6.5px; font-weight: 700; letter-spacing: 0.5px; color: var(--dow); }
+.hol-label { position: absolute; left: 5px; bottom: 4px; z-index: 2; white-space: nowrap; font-size: 7px; font-weight: 800; letter-spacing: 0.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.72); pointer-events: none; }
+.hol-label.r { left: auto; right: 5px; }
+.layer { position: relative; pointer-events: none; }
+.ev { position: absolute; pointer-events: auto; cursor: pointer; border: 0; margin: 0; padding: 0; background: none; text-align: left; height: 13px;
+  font-family: inherit; font-size: 9.5px; font-weight: 800; line-height: 13px; white-space: nowrap; }
+.ev .b { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.28); }
+.ev .t { position: relative; display: block; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; }
+.ev.out .t { overflow: visible; color: var(--white) !important; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.ev:hover .b, .ev:focus-visible .b { box-shadow: 0 0 0 1.5px var(--white); }
+.ev:focus-visible { outline: none; }
+.more { position: absolute; font-size: 9px; font-weight: 900; color: var(--light); pointer-events: none; }
+
+/* Up next widget */
+.side { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; min-height: 0; }
+.next { padding: 14px 16px 14px; display: flex; flex-direction: column; min-width: 0; }
+.w-title { font-size: 10.5px; font-weight: 800; letter-spacing: 1.8px; text-transform: uppercase; color: var(--light); margin: 0 0 10px; }
+.next ol { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 8px; overflow: hidden; }
+.next li button { width: 100%; display: grid; grid-template-columns: 42px 1fr; gap: 10px; align-items: center; border: 0; background: rgba(255,255,255,0.04);
+  border-radius: 12px; padding: 8px 10px 8px 8px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.next li button:hover, .next li button:focus-visible { background: rgba(255,255,255,0.09); outline: none; }
+.dchip { border-radius: 9px; text-align: center; padding: 4px 0 5px; line-height: 1; }
+.dchip b { display: block; font-size: 17px; font-weight: 800; }
+.dchip small { display: block; font-size: 8.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-top: 3px; opacity: 0.85; }
+.nt { min-width: 0; }
+.nt .t { font-size: 13px; font-weight: 800; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt .m { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.next .none { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.brand { padding: 16px 22px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 8px; min-width: 220px; }
+.brand img { height: 30px; display: block; }
+.brand .st { font-size: 10.5px; font-weight: 700; color: var(--muted); text-align: right; line-height: 1.35; white-space: pre-line; }
+
+/* Drawer */
+.scrim { position: fixed; inset: 0; background: rgba(8,8,28,0.35); z-index: 20; }
+.panel { position: fixed; z-index: 21; top: calc(var(--safe-top) + 8px); bottom: calc(var(--safe-bottom) + 8px); right: calc(var(--icons) + 40px);
+  width: min(380px, calc(100vw - 32px)); display: flex; flex-direction: column; background: rgba(26,26,62,0.92); border: 1px solid var(--glass-edge);
+  border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); overflow: hidden; }
+.p-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 20px 20px 12px; }
+.p-head .eb { font-size: 10.5px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; color: var(--light); margin-bottom: 5px; }
+.p-head h2 { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.2; }
+.x { background: rgba(255,255,255,0.08); border: 0; color: var(--white); width: 28px; height: 28px; border-radius: 50%; font-size: 16px; line-height: 1; cursor: pointer; }
+.x:hover, .x:focus-visible { background: rgba(255,255,255,0.16); outline: none; }
+.p-body { flex: 1; overflow-y: auto; padding: 6px 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.holnote { font-size: 12.5px; font-weight: 700; padding: 10px 12px; border-radius: 12px; background: repeating-linear-gradient(135deg, rgba(255,255,255,0.08) 0 4px, rgba(255,255,255,0.03) 4px 9px); }
+.card { display: block; width: 100%; border: 0; border-radius: 14px; padding: 12px 14px; text-align: left; font-family: inherit; cursor: pointer; }
+.card:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+.card .ct { font-size: 15px; font-weight: 800; line-height: 1.25; }
+.card .cm { font-size: 12px; font-weight: 600; margin-top: 3px; opacity: 0.85; }
+.empty { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0; }
+.hero { border-radius: 16px; padding: 14px 16px 16px; }
+.hero .pg { font-size: 10.5px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; opacity: 0.85; }
+.hero h3 { margin: 6px 0 0; font-size: 20px; font-weight: 800; line-height: 1.2; }
+dl { margin: 0; display: grid; grid-template-columns: 80px 1fr; gap: 9px 12px; font-size: 13.5px; }
+dt { font-size: 10.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+dd { margin: 0; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; min-width: 0; }
+dd a { color: var(--light); font-weight: 800; }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+.btn { font-family: inherit; font-size: 13px; font-weight: 800; border-radius: 10px; padding: 9px 14px; cursor: pointer; border: 1px solid transparent; }
+.btn.pri { background: var(--light); color: var(--dark); }
+.btn.gh { background: rgba(255,255,255,0.06); color: var(--white); border-color: rgba(255,255,255,0.12); }
+.btn.del { background: transparent; color: #FF9A9E; border-color: rgba(224,78,83,0.45); }
+.btn.del.armed { background: #E04E53; color: var(--white); }
+.btn:focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+form { display: flex; flex-direction: column; gap: 11px; }
+label, legend { display: flex; flex-direction: column; gap: 5px; font-size: 10.5px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 0; }
+input, textarea { font-family: inherit; font-size: 14px; font-weight: 600; color: var(--white); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 8px 10px; letter-spacing: 0; text-transform: none; }
+input:focus-visible, textarea:focus-visible { outline: 2px solid var(--light); outline-offset: 0; }
+textarea { min-height: 80px; resize: vertical; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+fieldset { border: 0; margin: 0; padding: 0; }
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.chip { position: relative; }
+.chip input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.chip span { display: block; text-align: center; padding: 8px 6px; border-radius: 10px; font-size: 13px; font-weight: 800; letter-spacing: 0; text-transform: none; opacity: 0.5; border: 2px solid transparent; }
+.chip input:checked + span { opacity: 1; border-color: var(--white); }
+.chip input:focus-visible + span { outline: 2px solid var(--light); outline-offset: 2px; }
+.msg { font-size: 13px; font-weight: 700; color: #FF9A9E; margin: 0; }
+.hint { font-size: 11.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); }
+@media (max-width: 900px) { .side { display: none; } .grid { min-width: 980px; } .year { overflow-x: auto; } }
+@media (prefers-reduced-motion: no-preference) { .panel { animation: rise .16s ease-out; } @keyframes rise { from { transform: translateY(8px); opacity: .5; } } }
+</style>
+</head>
+<body>
+<div class="bar"></div>
+<main class="desk">
+  <section class="widget year" aria-label="2027 calendar">
+    <div class="year-head">
+      <h1>The Big a## Calendar<span class="yr">2027</span></h1>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+  <aside class="side">
+    <section class="widget next" aria-label="Up next">
+      <h2 class="w-title">Up next</h2>
+      <ol id="upnext"></ol>
+    </section>
+    <section class="widget brand">
+      <img alt="TechBuffalo" src="data:image/png;base64,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">
+      <div class="st" id="status"></div>
+    </section>
+  </aside>
+</main>
+<div class="scrim" id="scrim" hidden></div>
+<div class="panel" id="panel" hidden role="dialog" aria-modal="true" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+  // Google Apps Script web app URL (set after deploying gas/Code.gs). Empty = holidays only.
+  const API = "https://script.google.com/macros/s/AKfycbwlw_7w5zpqdK1USClSLgQFGb8pR8WNk-P4B-64UtNOa9yYucyry2wv4sWfPHGuBH5F9Q/exec";
+  const Y = 2027, COLS = 31;
+  const PROGRAMS = {
+    k12:         { label: "K12",         color: "#4F58D9", ink: "#FFFFFF" },
+    certificate: { label: "Certificate", color: "#3DE7E7", ink: "#202046" },
+    college:     { label: "College",     color: "#A9AEF5", ink: "#202046" },
+    established: { label: "Established", color: "#E04E53", ink: "#FFFFFF" }
+  };
+  // TechBuffalo paid holidays 2027 (Employee Manual, April 2024, section 3-4). Floating holiday not shown.
+  const HOLIDAYS = {
+    "2027-01-01": "New Year's Day", "2027-01-18": "MLK Day", "2027-02-15": "Presidents Day",
+    "2027-05-31": "Memorial Day", "2027-06-18": "Juneteenth (obs.)", "2027-07-05": "July 4 (obs.)",
+    "2027-09-06": "Labor Day", "2027-10-11": "Indigenous Peoples Day", "2027-11-11": "Veterans Day",
+    "2027-11-25": "Thanksgiving", "2027-11-26": "Day after Thanksgiving",
+    "2027-12-23": "Christmas Eve (obs.)", "2027-12-24": "Christmas (obs.)", "2027-12-31": "New Year's Eve"
+  };
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DOW = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+  const pad = n => String(n).padStart(2, "0");
+  const key = (m, d) => `${Y}-${pad(m + 1)}-${pad(d)}`;
+  const dim = m => new Date(Y, m + 1, 0).getDate();
+  const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const fmt = (s, o) => parse(s).toLocaleDateString("en-US", o);
+  const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const isDate = s => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const safeUrl = u => (typeof u === "string" && /^https:\/\//i.test(u.trim())) ? u.trim() : "";
+  const endOf = e => (isDate(e.end) && e.end >= e.start ? e.end : e.start);
+  const $ = id => document.getElementById(id);
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) {} } };
+
+  if (location.hash === "#wallpaper") document.documentElement.classList.add("wallpaper");
+  const STATIC = window.BAC_STATIC || null;
+  const DEMO = !STATIC && !API.startsWith("https://");
+  const SAMPLES = [
+    { id: "wit-2027-03-25", title: "Women in Tech", program: "established", start: "2027-03-25", end: "", time: "10:00 AM – 5:00 PM", location: "Golisano Institute", owner: "Brittany Reling", asana: "https://app.asana.com/1/1208245949004916/project/1219793326008573/list/1219795791470658", notes: "" },
+    { id: "s1", title: "Sample: Fellows session", program: "k12", start: "2027-02-09", end: "2027-02-11", time: "", location: "", owner: "", asana: "", notes: "Sample date to try the calendar. Delete it any time." },
+    { id: "s2", title: "Sample: Pathway info night", program: "certificate", start: "2027-04-14", end: "", time: "6:00 PM", location: "", owner: "", asana: "", notes: "Sample date to try the calendar." },
+    { id: "s3", title: "Sample: Summer intern cohort", program: "college", start: "2027-06-07", end: "2027-08-13", time: "", location: "", owner: "", asana: "", notes: "Sample date to try the calendar." }
+  ];
+  const S = { events: STATIC ? STATIC.events : [], loaded: !!STATIC, ok: !!STATIC, sel: null };
+  const now = new Date(), todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  // Legend
+  for (const p of Object.values(PROGRAMS)) {
+    const s = document.createElement("span"), i = document.createElement("i");
+    i.style.background = p.color; s.append(i, document.createTextNode(p.label)); $("legend").appendChild(s);
+  }
+  { const s = document.createElement("span"), i = document.createElement("i"); i.className = "hol"; s.append(i, document.createTextNode("TechBuffalo holidays")); $("legend").appendChild(s); }
+
+  // Year grid
+  const grid = $("grid"), layers = [];
+  grid.style.gridTemplateColumns = `52px repeat(${COLS}, minmax(0, 1fr))`;
+  grid.style.gridTemplateRows = `repeat(12, minmax(36px, 1fr))`;
+  function holLabel(m, d) {
+    if (!HOLIDAYS[key(m, d)] || (d > 1 && HOLIDAYS[key(m, d - 1)])) return "";
+    const labels = []; for (let x = d; x <= dim(m) && HOLIDAYS[key(m, x)]; x++) labels.push(HOLIDAYS[key(m, x)]);
+    return `<span class="hol-label${d + labels.length - 1 >= 28 && labels.length === 1 ? " r" : ""}">${esc(labels.join(" · "))}</span>`;
+  }
+  for (let m = 0; m < 12; m++) {
+    const lab = document.createElement("div");
+    lab.className = "mon" + (m === 0 ? " first" : ""); lab.style.gridRow = m + 1; lab.style.gridColumn = 1; lab.textContent = MONTHS[m];
+    grid.appendChild(lab);
+    for (let d = 1; d <= dim(m); d++) {
+      const k = key(m, d), c = document.createElement("button");
+      c.type = "button"; c.dataset.date = k;
+      c.className = "cell" + (m === 0 ? " first-row" : "") + (HOLIDAYS[k] ? " off" : "") + (k === todayKey ? " today" : "");
+      c.style.gridRow = m + 1; c.style.gridColumn = d + 1;
+      c.setAttribute("aria-label", fmt(k, { weekday: "long", month: "long", day: "numeric" }) + (HOLIDAYS[k] ? ", " + HOLIDAYS[k] : ""));
+      c.innerHTML = `<span class="h"><span class="n">${d}</span><span class="d" data-l="${DOW[new Date(Y, m, d).getDay()]}">${DOW[new Date(Y, m, d).getDay()]}</span></span>` + holLabel(m, d);
+      grid.appendChild(c);
+    }
+    const layer = document.createElement("div");
+    layer.className = "layer"; layer.style.gridRow = m + 1; layer.style.gridColumn = `2 / span ${COLS}`;
+    grid.appendChild(layer); layers.push(layer);
+  }
+  grid.addEventListener("click", e => {
+    const ev = e.target.closest(".ev"); if (ev) return openEvent(ev.dataset.id);
+    const c = e.target.closest(".cell"); if (c) openDay(c.dataset.date);
+  });
+
+  // Event bars. A multi-day bar carries its title inside; a one-day block shows its title running to the right.
+  const measure = document.createElement("span");
+  measure.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font-size:9.5px;font-weight:800";
+  document.body.appendChild(measure);
+  function renderEvents() {
+    const colW0 = layers[0].clientWidth / COLS;
+    grid.querySelectorAll(".d").forEach(d => { d.textContent = colW0 < 46 ? d.dataset.l.slice(0, 2) : d.dataset.l; });
+    const by = Array.from({ length: 12 }, () => []);
+    for (const e of S.events) {
+      if (!isDate(e.start)) continue;
+      const s = parse(e.start), en = parse(endOf(e));
+      for (let m = 0; m < 12; m++) {
+        const ms = new Date(Y, m, 1), me = new Date(Y, m, dim(m));
+        if (en < ms || s > me) continue;
+        by[m].push({ e, c0: (s < ms ? 1 : s.getDate()) - 1, c1: (en > me ? dim(m) : en.getDate()) - 1 });
+      }
+    }
+    layers.forEach((layer, m) => {
+      layer.textContent = "";
+      const W = layer.clientWidth, H = layer.clientHeight, colW = W / COLS;
+      const TOP = 17, LANE = 13, GAP = 2, RESERVE = 12;
+      const lanes = Math.max(1, Math.floor((H - TOP - RESERVE + GAP) / (LANE + GAP)));
+      const occ = Array.from({ length: lanes }, () => new Array(COLS + 40).fill(false)), hidden = {};
+      const segs = by[m].sort((a, b) => a.c0 - b.c0 || (b.c1 - b.c0) - (a.c1 - a.c0));
+      for (const g of segs) {
+        const p = PROGRAMS[g.e.program] || PROGRAMS.established, title = String(g.e.title || "Untitled");
+        const span = g.c1 - g.c0 + 1, bw = span * colW - 4;
+        measure.textContent = title;
+        const tw = measure.offsetWidth + 12, out = tw > bw;
+        const vEnd = out ? g.c1 + Math.ceil((tw + 4) / colW) : g.c1;
+        let L = -1;
+        for (let l = 0; l < lanes && L < 0; l++) { let ok = true; for (let c = g.c0; c <= vEnd; c++) if (occ[l][c]) { ok = false; break; } if (ok) L = l; }
+        if (L < 0) { for (let c = g.c0; c <= g.c1; c++) hidden[c] = (hidden[c] || 0) + 1; continue; }
+        for (let c = g.c0; c <= vEnd; c++) occ[L][c] = true;
+        const el = document.createElement("button"); el.type = "button"; el.className = "ev" + (out ? " out" : ""); el.dataset.id = g.e.id;
+        el.title = title; el.setAttribute("aria-label", `${title}, ${p.label}`);
+        el.style.left = (g.c0 * colW + 2) + "px"; el.style.top = (TOP + L * (LANE + GAP)) + "px";
+        el.style.width = (out ? Math.min(W - g.c0 * colW - 2, bw + tw + 4) : bw) + "px";
+        const bar = document.createElement("span"); bar.className = "b"; bar.style.width = bw + "px"; bar.style.background = p.color;
+        const t = document.createElement("span"); t.className = "t"; t.textContent = title; t.style.color = p.ink;
+        if (out) t.style.paddingLeft = (bw + 5) + "px";
+        el.append(bar, t); layer.appendChild(el);
+      }
+      for (const [c, k] of Object.entries(hidden)) {
+        const t = document.createElement("div"); t.className = "more"; t.textContent = "+" + k;
+        t.style.left = (+c * colW + 5) + "px"; t.style.top = (H - RESERVE - 1) + "px";
+        layer.appendChild(t);
+      }
+    });
+    renderNext(); renderStatus();
+  }
+  let rT; window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(renderEvents, 80); });
+
+  // Up next widget: next program dates from today (or from Jan 1, 2027)
+  function renderNext() {
+    const from = todayKey > `${Y}-01-01` ? todayKey : `${Y}-01-01`;
+    const items = S.events.filter(e => isDate(e.start) && endOf(e) >= from).map(e => ({ type: "ev", date: e.start < from ? from : e.start, e }));
+    const hol = Object.keys(HOLIDAYS).find(k => k >= from);
+    if (hol) items.push({ type: "hol", date: hol });
+    items.sort((a, b) => a.date.localeCompare(b.date) || (a.type === "hol") - (b.type === "hol"));
+    const ol = $("upnext"); ol.textContent = "";
+    const list = items.slice(0, 6);
+    if (!S.events.length) {
+      const li = document.createElement("li"); li.className = "none";
+      li.textContent = S.loaded ? "No program dates yet. Click any day to add one." : "Loading program dates…";
+      ol.appendChild(li);
+    }
+    for (const it of list) {
+      const li = document.createElement("li"), b = document.createElement("button"); b.type = "button";
+      const chip = document.createElement("span"); chip.className = "dchip";
+      const dd = document.createElement("b"); dd.textContent = String(parse(it.date).getDate());
+      const mm = document.createElement("small"); mm.textContent = MONTHS[parse(it.date).getMonth()];
+      chip.append(dd, mm);
+      const nt = document.createElement("span"); nt.className = "nt";
+      const t = document.createElement("div"); t.className = "t";
+      const mline = document.createElement("div"); mline.className = "m";
+      if (it.type === "hol") {
+        chip.style.background = "repeating-linear-gradient(135deg, rgba(255,255,255,0.14) 0 3px, rgba(255,255,255,0.05) 3px 7px)";
+        t.textContent = HOLIDAYS[it.date]; mline.textContent = "TechBuffalo holiday · office closed";
+        b.addEventListener("click", () => openDay(it.date));
+      } else {
+        const p = PROGRAMS[it.e.program] || PROGRAMS.established;
+        chip.style.background = p.color; chip.style.color = p.ink;
+        t.textContent = it.e.title || "Untitled";
+        mline.textContent = [p.label, it.e.time, it.e.location].filter(Boolean).join(" · ");
+        b.addEventListener("click", () => openEvent(it.e.id));
+      }
+      nt.append(t, mline); b.append(chip, nt); li.appendChild(b); ol.appendChild(li);
+    }
+  }
+  function renderStatus() {
+    const el = $("status");
+    if (STATIC) { el.textContent = ""; return; }
+    if (DEMO) { el.textContent = "Demo: changes stay in this browser\nClick any day for details"; return; }
+    if (!S.loaded) { el.textContent = "Loading…"; return; }
+    if (!S.ok) { el.textContent = "Can't reach the team sheet. Retrying."; return; }
+    const n = S.events.length; el.textContent = `${n} program date${n === 1 ? "" : "s"}\nClick any day for details`;
+  }
+
+  // Data
+  async function load() {
+    if (DEMO) { let d = null; try { d = JSON.parse(store.get("bac-demo") || "null"); } catch (_) {} S.events = Array.isArray(d) ? d : SAMPLES.slice(); S.ok = true; S.loaded = true; renderEvents(); return; }
+    if (STATIC) { S.loaded = true; renderEvents(); return; }
+    try {
+      const r = await fetch(API + "?t=" + Date.now()); const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "bad response");
+      S.events = Array.isArray(j.events) ? j.events : []; S.ok = true;
+    } catch (_) { S.ok = false; }
+    S.loaded = true; renderEvents();
+    if (!$("panel").hidden && !$("panel").querySelector("form") && S.sel) refreshPanel();
+  }
+  async function send(payload) {
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+    return r.json();
+  }
+  document.fonts.ready.then(renderEvents);
+  load();
+  if (!STATIC) { setInterval(load, 60000); window.addEventListener("focus", load); }
+
+  // Drawer
+  const panel = $("panel"), scrim = $("scrim");
+  let view = null;
+  function open(html, v) { view = v; panel.innerHTML = html; panel.hidden = false; scrim.hidden = false; (panel.querySelector("[autofocus]") || panel.querySelector(".x")).focus(); }
+  function close() { panel.hidden = true; scrim.hidden = true; mark(null); view = null; }
+  function refreshPanel() { if (!view) return; if (view.t === "day") openDay(view.date); else if (view.t === "ev") { if (S.events.some(e => e.id === view.id)) openEvent(view.id); else openDay(S.sel); } }
+  scrim.addEventListener("click", close);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) close(); });
+  function mark(date) { grid.querySelectorAll(".cell.sel").forEach(c => c.classList.remove("sel")); S.sel = date; if (date) grid.querySelector(`.cell[data-date="${date}"]`)?.classList.add("sel"); }
+  const head = (eb, title) => `<div class="p-head"><div><div class="eb">${esc(eb)}</div><h2>${esc(title)}</h2></div><button type="button" class="x" data-act="close" aria-label="Close">✕</button></div>`;
+  const editable = () => DEMO || (!STATIC && API.startsWith("https://") && S.ok);
+
+  function openDay(date) {
+    mark(date);
+    const items = S.events.filter(e => isDate(e.start) && e.start <= date && endOf(e) >= date).sort((a, b) => a.start.localeCompare(b.start));
+    let body = HOLIDAYS[date] ? `<div class="holnote">TechBuffalo holiday: ${esc(HOLIDAYS[date])}. Office closed.</div>` : "";
+    if (!items.length) body += `<p class="empty">Nothing scheduled.</p>`;
+    for (const e of items) {
+      const p = PROGRAMS[e.program] || PROGRAMS.established;
+      body += `<button type="button" class="card" data-act="ev" data-id="${esc(e.id)}" style="background:${p.color};color:${p.ink}"><div class="ct">${esc(e.title || "Untitled")}</div><div class="cm">${[p.label, e.time, e.location].filter(Boolean).map(esc).join(" · ")}</div></button>`;
+    }
+    if (editable()) body += `<div class="acts"><button type="button" class="btn pri" data-act="add" data-date="${date}">Add a date</button></div>`;
+    open(head(fmt(date, { weekday: "long" }), fmt(date, { month: "long", day: "numeric", year: "numeric" })) + `<div class="p-body">${body}</div>`, { t: "day", date });
+  }
+
+  function openEvent(id) {
+    const e = S.events.find(x => x.id === id); if (!e) return;
+    mark(e.start);
+    const p = PROGRAMS[e.program] || PROGRAMS.established, asana = safeUrl(e.asana);
+    const when = endOf(e) > e.start
+      ? `${fmt(e.start, { weekday: "short", month: "short", day: "numeric" })} – ${fmt(endOf(e), { weekday: "short", month: "short", day: "numeric" })}`
+      : fmt(e.start, { weekday: "long", month: "long", day: "numeric" });
+    const rows = [["When", esc(when)], e.time && ["Time", esc(e.time)], e.location && ["Location", esc(e.location)], e.owner && ["Owner", esc(e.owner)],
+      asana && ["Asana", `<a href="${esc(asana)}" target="_blank" rel="noopener">Open in Asana</a>`], e.notes && ["Notes", esc(e.notes)]]
+      .filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    const acts = (editable() ? `<button type="button" class="btn pri" data-act="edit" data-id="${esc(e.id)}">Edit</button><button type="button" class="btn del" data-act="del" data-id="${esc(e.id)}">Delete</button>` : "")
+      + `<button type="button" class="btn gh" data-act="day" data-date="${esc(e.start)}">Back to day</button>`;
+    open(head(p.label, fmt(e.start, { month: "long", day: "numeric", year: "numeric" })) +
+      `<div class="p-body"><div class="hero" style="background:${p.color};color:${p.ink}"><div class="pg">${esc(p.label)}</div><h3>${esc(e.title || "Untitled")}</h3></div><dl>${rows}</dl><div class="acts">${acts}</div><p class="msg" id="msg" hidden></p></div>`, { t: "ev", id });
+  }
+
+  function openForm(existing, date) {
+    const e = existing || { title: "", program: "", start: date, end: "", time: "", location: "", owner: "", asana: "", notes: "" };
+    const chips = Object.entries(PROGRAMS).map(([k, p]) => `<label class="chip"><input type="radio" name="program" value="${k}"${e.program === k ? " checked" : ""}><span style="background:${p.color};color:${p.ink}">${p.label}</span></label>`).join("");
+    const needCode = !DEMO && !store.get("bac-passcode");
+    open(head(existing ? "Edit date" : "New date", existing ? (e.title || "Untitled") : fmt(date, { month: "long", day: "numeric", year: "numeric" })) +
+      `<div class="p-body"><form id="f" novalidate>
+        <label>Title<input id="f-title" name="title" maxlength="120" value="${esc(e.title)}" autofocus></label>
+        <fieldset><legend>Program</legend><div class="chips">${chips}</div></fieldset>
+        <div class="two"><label>Start<input id="f-start" name="start" type="date" min="2027-01-01" max="2027-12-31" value="${esc(e.start)}"></label>
+        <label>End<input id="f-end" name="end" type="date" min="2027-01-01" max="2027-12-31" value="${esc(e.end || "")}"></label></div>
+        <label>Time<input id="f-time" name="time" maxlength="60" placeholder="10:00 AM – 5:00 PM" value="${esc(e.time)}"></label>
+        <label>Location<input id="f-location" name="location" maxlength="160" value="${esc(e.location)}"></label>
+        <label>Owner<input id="f-owner" name="owner" maxlength="80" value="${esc(e.owner)}"></label>
+        <label>Asana link<input id="f-asana" name="asana" type="url" maxlength="500" placeholder="https://app.asana.com/…" value="${esc(e.asana)}"></label>
+        <label>Notes<textarea id="f-notes" name="notes" maxlength="2000">${esc(e.notes)}</textarea></label>
+        ${needCode ? `<label>Team passcode<input id="f-code" name="code" type="password" autocomplete="off" maxlength="80"><span class="hint">Asked once. This browser remembers it.</span></label>` : ""}
+        <p class="msg" id="msg" hidden></p>
+        <div class="acts"><button type="submit" class="btn pri" id="f-save">${existing ? "Save changes" : "Add date"}</button>
+        <button type="button" class="btn gh" data-act="${existing ? "ev" : "day"}" data-id="${esc(e.id || "")}" data-date="${esc(e.start || date)}">Cancel</button></div>
+      </form></div>`, { t: "form" });
+    $("f").addEventListener("submit", ev => { ev.preventDefault(); save(ev.target, existing); });
+  }
+  const msg = t => { const m = $("msg"); if (m) { m.textContent = t; m.hidden = !t; } };
+  async function save(f, existing) {
+    const v = n => (f.elements[n]?.value || "").trim();
+    const program = f.querySelector('input[name="program"]:checked')?.value;
+    const ev = { id: existing?.id || "", title: v("title"), program, start: v("start"), end: v("end"), time: v("time"), location: v("location"), owner: v("owner"), asana: v("asana"), notes: v("notes") };
+    if (!ev.title) return msg("Add a title.");
+    if (!program) return msg("Choose a program.");
+    if (!isDate(ev.start) || !ev.start.startsWith("2027")) return msg("Choose a start date in 2027.");
+    if (ev.end && (!isDate(ev.end) || ev.end < ev.start)) return msg("The end date has to be on or after the start date.");
+    if (ev.end === ev.start) ev.end = "";
+    if (ev.asana && !safeUrl(ev.asana)) return msg("The Asana link has to start with https://");
+    if (DEMO) {
+      if (!ev.id) ev.id = "d" + Date.now().toString(36);
+      const i = S.events.findIndex(x => x.id === ev.id); if (i >= 0) S.events[i] = ev; else S.events.push(ev);
+      store.set("bac-demo", JSON.stringify(S.events)); renderEvents(); openEvent(ev.id); return;
+    }
+    const code = v("code") || store.get("bac-passcode");
+    if (!code) return msg("Enter the team passcode.");
+    const btn = $("f-save"); btn.disabled = true; btn.textContent = "Saving…";
+    try {
+      const j = await send({ action: "save", passcode: code, event: ev });
+      if (!j.ok) throw j;
+      store.set("bac-passcode", code);
+      S.events = j.events; renderEvents(); openEvent(j.id);
+    } catch (err) {
+      btn.disabled = false; btn.textContent = existing ? "Save changes" : "Add date";
+      if (err && err.error === "passcode") { store.set("bac-passcode", null); msg("That passcode didn't work. Check it with Jeffrey and try again."); }
+      else if (err && err.error) msg("That didn't save: " + err.error);
+      else msg("That didn't save. Check your connection and try again.");
+    }
+  }
+
+  panel.addEventListener("click", async ev => {
+    const t = ev.target.closest("[data-act]"); if (!t) return;
+    const a = t.dataset.act;
+    if (a === "close") close();
+    else if (a === "ev") t.dataset.id ? openEvent(t.dataset.id) : openDay(t.dataset.date);
+    else if (a === "day") openDay(t.dataset.date);
+    else if (a === "add") openForm(null, t.dataset.date);
+    else if (a === "edit") openForm(S.events.find(x => x.id === t.dataset.id), null);
+    else if (a === "del") {
+      if (!t.classList.contains("armed")) { t.classList.add("armed"); t.textContent = "Confirm delete"; return; }
+      if (DEMO) { const e = S.events.find(x => x.id === t.dataset.id); S.events = S.events.filter(x => x.id !== t.dataset.id); store.set("bac-demo", JSON.stringify(S.events)); renderEvents(); openDay(e ? e.start : S.sel); return; }
+      const code = store.get("bac-passcode");
+      if (!code) { msg("Open Edit and enter the team passcode first."); return; }
+      t.disabled = true;
+      const e = S.events.find(x => x.id === t.dataset.id);
+      try { const j = await send({ action: "delete", passcode: code, id: t.dataset.id }); if (!j.ok) throw j; S.events = j.events; renderEvents(); openDay(e ? e.start : S.sel); }
+      catch (err) { t.disabled = false; msg(err && err.error === "passcode" ? "That passcode didn't work." : "That didn't delete. Try again."); }
+    }
+  });
+})();
+</script>
+</body>
+</html>
