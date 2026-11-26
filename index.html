@@ -22,6 +22,15 @@
 :root.wallpaper { --safe-top: 56px; --safe-bottom: 96px; --icons: 230px; }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
+:root.size-medium .desk { right: auto; bottom: auto; width: min(1120px, 70vw); height: min(78vh, 820px); }
+:root.size-small .desk { right: auto; bottom: auto; width: min(820px, 58vw); height: auto; grid-template-rows: auto auto; }
+:root.size-small .year { padding: 16px 18px 12px; }
+:root.size-small .grid { height: 168px; }
+:root.size-small .legend { display: none; }
+:root.size-small h1 { font-size: 20px; }
+:root.size-small .next ol { grid-auto-columns: minmax(190px, 1fr); }
+:root.size-small .brand { display: none; }
+:root.size-small .side { grid-template-columns: 1fr; }
 html, body { height: 100%; margin: 0; }
 body { font-family: var(--font); color: var(--white); overflow: hidden; background: var(--dark);
   background-image:
@@ -199,7 +208,12 @@ fieldset { border: 0; margin: 0; padding: 0; }
   const $ = id => document.getElementById(id);
   const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) {} } };
 
-  if (location.hash === "#wallpaper") document.documentElement.classList.add("wallpaper");
+  // Hash modes: #wallpaper (full), #wallpaper-medium, #wallpaper-small (3 months + Up next)
+  const MODE = location.hash.slice(1);
+  if (MODE.startsWith("wallpaper")) document.documentElement.classList.add("wallpaper");
+  if (MODE.endsWith("-medium")) document.documentElement.classList.add("size-medium");
+  if (MODE.endsWith("-small")) document.documentElement.classList.add("size-small");
+  window.addEventListener("hashchange", () => location.reload());
   const STATIC = window.BAC_STATIC || null;
   const DEMO = !STATIC && !API.startsWith("https://");
   const SAMPLES = [
@@ -220,30 +234,35 @@ fieldset { border: 0; margin: 0; padding: 0; }
 
   // Year grid
   const grid = $("grid"), layers = [];
+  const SMALL = MODE.endsWith("-small");
+  const m0 = SMALL && now.getFullYear() === Y ? Math.min(now.getMonth(), 9) : 0;
+  const SHOW = SMALL ? [m0, m0 + 1, m0 + 2] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   grid.style.gridTemplateColumns = `52px repeat(${COLS}, minmax(0, 1fr))`;
-  grid.style.gridTemplateRows = `repeat(12, minmax(36px, 1fr))`;
+  grid.style.gridTemplateRows = `repeat(${SHOW.length}, minmax(${SMALL ? 44 : 30}px, 1fr))`;
+  const SHORT = { "Juneteenth (obs.)": "Juneteenth", "July 4 (obs.)": "July 4", "Christmas Eve (obs.)": "Christmas Eve", "Christmas (obs.)": "Christmas", "Day after Thanksgiving": "Day after", "Indigenous Peoples Day": "Indigenous Peoples" };
   function holLabel(m, d) {
     if (!HOLIDAYS[key(m, d)] || (d > 1 && HOLIDAYS[key(m, d - 1)])) return "";
-    const labels = []; for (let x = d; x <= dim(m) && HOLIDAYS[key(m, x)]; x++) labels.push(HOLIDAYS[key(m, x)]);
+    const labels = []; for (let x = d; x <= dim(m) && HOLIDAYS[key(m, x)]; x++) labels.push(SHORT[HOLIDAYS[key(m, x)]] || HOLIDAYS[key(m, x)]);
     return `<span class="hol-label${d + labels.length - 1 >= 28 && labels.length === 1 ? " r" : ""}">${esc(labels.join(" · "))}</span>`;
   }
-  for (let m = 0; m < 12; m++) {
+  SHOW.forEach((m, ri) => {
+    const r = ri + 1;
     const lab = document.createElement("div");
-    lab.className = "mon" + (m === 0 ? " first" : ""); lab.style.gridRow = m + 1; lab.style.gridColumn = 1; lab.textContent = MONTHS[m];
+    lab.className = "mon" + (ri === 0 ? " first" : ""); lab.style.gridRow = r; lab.style.gridColumn = 1; lab.textContent = MONTHS[m];
     grid.appendChild(lab);
     for (let d = 1; d <= dim(m); d++) {
       const k = key(m, d), c = document.createElement("button");
       c.type = "button"; c.dataset.date = k;
-      c.className = "cell" + (m === 0 ? " first-row" : "") + (HOLIDAYS[k] ? " off" : "") + (k === todayKey ? " today" : "");
-      c.style.gridRow = m + 1; c.style.gridColumn = d + 1;
+      c.className = "cell" + (ri === 0 ? " first-row" : "") + (HOLIDAYS[k] ? " off" : "") + (k === todayKey ? " today" : "");
+      c.style.gridRow = r; c.style.gridColumn = d + 1;
       c.setAttribute("aria-label", fmt(k, { weekday: "long", month: "long", day: "numeric" }) + (HOLIDAYS[k] ? ", " + HOLIDAYS[k] : ""));
       c.innerHTML = `<span class="h"><span class="n">${d}</span><span class="d" data-l="${DOW[new Date(Y, m, d).getDay()]}">${DOW[new Date(Y, m, d).getDay()]}</span></span>` + holLabel(m, d);
       grid.appendChild(c);
     }
     const layer = document.createElement("div");
-    layer.className = "layer"; layer.style.gridRow = m + 1; layer.style.gridColumn = `2 / span ${COLS}`;
+    layer.className = "layer"; layer.style.gridRow = r; layer.style.gridColumn = `2 / span ${COLS}`; layer.dataset.m = m;
     grid.appendChild(layer); layers.push(layer);
-  }
+  });
   grid.addEventListener("click", e => {
     const ev = e.target.closest(".ev"); if (ev) return openEvent(ev.dataset.id);
     const c = e.target.closest(".cell"); if (c) openDay(c.dataset.date);
@@ -255,7 +274,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
   document.body.appendChild(measure);
   function renderEvents() {
     const colW0 = layers[0].clientWidth / COLS;
-    grid.querySelectorAll(".d").forEach(d => { d.textContent = colW0 < 46 ? d.dataset.l.slice(0, 2) : d.dataset.l; });
+    grid.querySelectorAll(".d").forEach(d => { d.textContent = colW0 < 32 ? "" : colW0 < 46 ? d.dataset.l.slice(0, 2) : d.dataset.l; });
     const by = Array.from({ length: 12 }, () => []);
     for (const e of S.events) {
       if (!isDate(e.start)) continue;
@@ -266,7 +285,8 @@ fieldset { border: 0; margin: 0; padding: 0; }
         by[m].push({ e, c0: (s < ms ? 1 : s.getDate()) - 1, c1: (en > me ? dim(m) : en.getDate()) - 1 });
       }
     }
-    layers.forEach((layer, m) => {
+    layers.forEach(layer => {
+      const m = +layer.dataset.m;
       layer.textContent = "";
       const W = layer.clientWidth, H = layer.clientHeight, colW = W / COLS;
       const TOP = 17, LANE = 13, GAP = 2, RESERVE = 12;
