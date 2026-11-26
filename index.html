@@ -67,6 +67,11 @@ h1 .yr { color: var(--light); margin-left: 8px; }
   text-transform: uppercase; color: rgba(255,255,255,0.72); pointer-events: none; }
 .hol-label.r { left: auto; right: 5px; }
 .layer { position: relative; pointer-events: none; }
+.layer { z-index: 0; }
+.cell { z-index: 1; }
+.fill { position: absolute; display: flex; border-radius: 3px; overflow: hidden; pointer-events: none; opacity: 0.62; }
+.fill span { flex: 1; position: relative; }
+.fill span.dl::after { content: "\25C6"; position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; font-size: 9px; color: #FFFFFF; text-shadow: 0 0 2px rgba(0,0,0,0.85); }
 .ev { position: absolute; pointer-events: auto; cursor: pointer; border: 0; margin: 0; padding: 0; background: none; text-align: left; height: 13px;
   font-family: inherit; font-size: 9.5px; font-weight: 800; line-height: 13px; white-space: nowrap; }
 .ev .b { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.28); }
@@ -227,6 +232,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
     i.style.background = p.color; s.append(i, document.createTextNode(p.label)); $("legend").appendChild(s);
   }
   { const s = document.createElement("span"), i = document.createElement("i"); i.className = "hol"; s.append(i, document.createTextNode("TechBuffalo holidays")); $("legend").appendChild(s); }
+  { const s = document.createElement("span"); s.textContent = "\u25C6 Deadline"; $("legend").appendChild(s); }
 
   // Year grid
   const grid = $("grid"), layers = [];
@@ -264,54 +270,39 @@ fieldset { border: 0; margin: 0; padding: 0; }
     const c = e.target.closest(".cell"); if (c) openDay(c.dataset.date);
   });
 
-  // Event bars. A multi-day bar carries its title inside; a one-day block shows its title running to the right.
-  const measure = document.createElement("span");
-  measure.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font-size:9.5px;font-weight:800";
-  document.body.appendChild(measure);
+  // Day colors. Each day fills with the colors of the programs on it; a day with several programs splits evenly.
+  // A deadline shows a diamond in its program's color segment.
+  const ORDER = Object.keys(PROGRAMS);
   function renderEvents() {
     const colW0 = layers[0].clientWidth / COLS;
     grid.querySelectorAll(".d").forEach(d => { d.textContent = colW0 < 32 ? "" : colW0 < 46 ? d.dataset.l.slice(0, 2) : d.dataset.l; });
-    const by = Array.from({ length: 12 }, () => []);
+    const day = {};
     for (const e of S.events) {
       if (!isDate(e.start)) continue;
-      const s = parse(e.start), en = parse(endOf(e));
-      for (let m = 0; m < 12; m++) {
-        const ms = new Date(Y, m, 1), me = new Date(Y, m, dim(m));
-        if (en < ms || s > me) continue;
-        by[m].push({ e, c0: (s < ms ? 1 : s.getDate()) - 1, c1: (en > me ? dim(m) : en.getDate()) - 1 });
+      const p = PROGRAMS[e.program] ? e.program : "established", dl = e.type === "deadline";
+      for (let d = parse(e.start), end = parse(endOf(e)); d <= end; d.setDate(d.getDate() + 1)) {
+        if (d.getFullYear() !== Y) continue;
+        const k = `${Y}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const o = ((day[k] = day[k] || {})[p] = day[k][p] || { ev: false, dl: false });
+        if (dl) o.dl = true; else o.ev = true;
       }
     }
     layers.forEach(layer => {
       const m = +layer.dataset.m;
       layer.textContent = "";
-      const W = layer.clientWidth, H = layer.clientHeight, colW = W / COLS;
-      const TOP = 17, LANE = 13, GAP = 2, RESERVE = 12;
-      const lanes = Math.max(1, Math.floor((H - TOP - RESERVE + GAP) / (LANE + GAP)));
-      const occ = Array.from({ length: lanes }, () => new Array(COLS + 40).fill(false)), hidden = {};
-      const segs = by[m].sort((a, b) => a.c0 - b.c0 || (b.c1 - b.c0) - (a.c1 - a.c0));
-      for (const g of segs) {
-        const p = PROGRAMS[g.e.program] || PROGRAMS.established, title = String(g.e.title || "Untitled");
-        const span = g.c1 - g.c0 + 1, bw = span * colW - 4;
-        measure.textContent = title;
-        const tw = measure.offsetWidth + 12, out = tw > bw;
-        const vEnd = out ? g.c1 + Math.ceil((tw + 4) / colW) : g.c1;
-        let L = -1;
-        for (let l = 0; l < lanes && L < 0; l++) { let ok = true; for (let c = g.c0; c <= vEnd; c++) if (occ[l][c]) { ok = false; break; } if (ok) L = l; }
-        if (L < 0) { for (let c = g.c0; c <= g.c1; c++) hidden[c] = (hidden[c] || 0) + 1; continue; }
-        for (let c = g.c0; c <= vEnd; c++) occ[L][c] = true;
-        const el = document.createElement("button"); el.type = "button"; el.className = "ev" + (out ? " out" : ""); el.dataset.id = g.e.id;
-        el.title = title; el.setAttribute("aria-label", `${title}, ${p.label}`);
-        el.style.left = (g.c0 * colW + 2) + "px"; el.style.top = (TOP + L * (LANE + GAP)) + "px";
-        el.style.width = (out ? Math.min(W - g.c0 * colW - 2, bw + tw + 4) : bw) + "px";
-        const bar = document.createElement("span"); bar.className = "b"; bar.style.width = bw + "px"; bar.style.background = p.color;
-        const t = document.createElement("span"); t.className = "t"; t.textContent = title; t.style.color = p.ink;
-        if (out) t.style.paddingLeft = (bw + 5) + "px";
-        el.append(bar, t); layer.appendChild(el);
-      }
-      for (const [c, k] of Object.entries(hidden)) {
-        const t = document.createElement("div"); t.className = "more"; t.textContent = "+" + k;
-        t.style.left = (+c * colW + 5) + "px"; t.style.top = (H - RESERVE - 1) + "px";
-        layer.appendChild(t);
+      const W = layer.clientWidth, H = layer.clientHeight, colW = W / COLS, TOP = 16;
+      for (let d = 1; d <= dim(m); d++) {
+        const k = key(m, d), info = day[k];
+        if (!info) continue;
+        const blk = document.createElement("div"); blk.className = "fill";
+        blk.style.left = ((d - 1) * colW + 1) + "px"; blk.style.width = Math.max(4, colW - 2) + "px";
+        blk.style.top = "2px"; blk.style.height = Math.max(6, H - 3) + "px";
+        for (const p of ORDER.filter(x => info[x])) {
+          const seg = document.createElement("span"); seg.style.background = PROGRAMS[p].color;
+          if (info[p].dl) seg.className = "dl";
+          blk.appendChild(seg);
+        }
+        layer.appendChild(blk);
       }
     });
     renderNext(); renderStatus();
@@ -349,7 +340,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
         const p = PROGRAMS[it.e.program] || PROGRAMS.established;
         chip.style.background = p.color; chip.style.color = p.ink;
         t.textContent = it.e.title || "Untitled";
-        mline.textContent = [p.label, it.e.time, it.e.location].filter(Boolean).join(" · ");
+        mline.textContent = [it.e.type === "deadline" ? "Deadline" : "", p.label, it.e.time, it.e.location].filter(Boolean).join(" · ");
         b.addEventListener("click", () => openEvent(it.e.id));
       }
       nt.append(t, mline); b.append(chip, nt); li.appendChild(b); ol.appendChild(li);
@@ -403,7 +394,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
     if (!items.length) body += `<p class="empty">Nothing scheduled.</p>`;
     for (const e of items) {
       const p = PROGRAMS[e.program] || PROGRAMS.established;
-      body += `<button type="button" class="card" data-act="ev" data-id="${esc(e.id)}" style="background:${p.color};color:${p.ink}"><div class="ct">${esc(e.title || "Untitled")}</div><div class="cm">${[p.label, e.time, e.location].filter(Boolean).map(esc).join(" · ")}</div></button>`;
+      body += `<button type="button" class="card" data-act="ev" data-id="${esc(e.id)}" style="background:${p.color};color:${p.ink}"><div class="ct">${esc(e.title || "Untitled")}</div><div class="cm">${[e.type === "deadline" ? "Deadline" : "", p.label, e.time, e.location].filter(Boolean).map(esc).join(" · ")}</div></button>`;
     }
     if (editable()) body += `<div class="acts"><button type="button" class="btn pri" data-act="add" data-date="${date}">Add a date</button></div>`;
     open(head(fmt(date, { weekday: "long" }), fmt(date, { month: "long", day: "numeric", year: "numeric" })) + `<div class="p-body">${body}</div>`, { t: "day", date });
@@ -422,17 +413,18 @@ fieldset { border: 0; margin: 0; padding: 0; }
     const acts = (editable() ? `<button type="button" class="btn pri" data-act="edit" data-id="${esc(e.id)}">Edit</button><button type="button" class="btn del" data-act="del" data-id="${esc(e.id)}">Delete</button>` : "")
       + `<button type="button" class="btn gh" data-act="day" data-date="${esc(e.start)}">Back to day</button>`;
     open(head(p.label, fmt(e.start, { month: "long", day: "numeric", year: "numeric" })) +
-      `<div class="p-body"><div class="hero" style="background:${p.color};color:${p.ink}"><div class="pg">${esc(p.label)}</div><h3>${esc(e.title || "Untitled")}</h3></div><dl>${rows}</dl><div class="acts">${acts}</div><p class="msg" id="msg" hidden></p></div>`, { t: "ev", id });
+      `<div class="p-body"><div class="hero" style="background:${p.color};color:${p.ink}"><div class="pg">${esc(p.label)}${e.type === "deadline" ? " · Deadline" : ""}</div><h3>${esc(e.title || "Untitled")}</h3></div><dl>${rows}</dl><div class="acts">${acts}</div><p class="msg" id="msg" hidden></p></div>`, { t: "ev", id });
   }
 
   function openForm(existing, date) {
-    const e = existing || { title: "", program: "", start: date, end: "", time: "", location: "", owner: "", asana: "", notes: "" };
+    const e = existing || { title: "", program: "", type: "event", start: date, end: "", time: "", location: "", owner: "", asana: "", notes: "" };
     const chips = Object.entries(PROGRAMS).map(([k, p]) => `<label class="chip"><input type="radio" name="program" value="${k}"${e.program === k ? " checked" : ""}><span style="background:${p.color};color:${p.ink}">${p.label}</span></label>`).join("");
     const needCode = !DEMO && !store.get("bac-passcode");
     open(head(existing ? "Edit date" : "New date", existing ? (e.title || "Untitled") : fmt(date, { month: "long", day: "numeric", year: "numeric" })) +
       `<div class="p-body"><form id="f" novalidate>
         <label>Title<input id="f-title" name="title" maxlength="120" value="${esc(e.title)}" autofocus></label>
         <fieldset><legend>Program</legend><div class="chips">${chips}</div></fieldset>
+        <fieldset><legend>Type</legend><div class="chips">${[["event", "Event"], ["deadline", "Deadline"]].map(([k, l]) => `<label class="chip"><input type="radio" name="type" value="${k}"${(e.type || "event") === k ? " checked" : ""}><span style="background:rgba(255,255,255,0.12);color:#FFFFFF">${l}</span></label>`).join("")}</div></fieldset>
         <div class="two"><label>Start<input id="f-start" name="start" type="date" min="2027-01-01" max="2027-12-31" value="${esc(e.start)}"></label>
         <label>End<input id="f-end" name="end" type="date" min="2027-01-01" max="2027-12-31" value="${esc(e.end || "")}"></label></div>
         <label>Time<input id="f-time" name="time" maxlength="60" placeholder="10:00 AM – 5:00 PM" value="${esc(e.time)}"></label>
@@ -451,7 +443,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
   async function save(f, existing) {
     const v = n => (f.elements[n]?.value || "").trim();
     const program = f.querySelector('input[name="program"]:checked')?.value;
-    const ev = { id: existing?.id || "", title: v("title"), program, start: v("start"), end: v("end"), time: v("time"), location: v("location"), owner: v("owner"), asana: v("asana"), notes: v("notes") };
+    const ev = { id: existing?.id || "", type: f.querySelector('input[name="type"]:checked')?.value || "event", title: v("title"), program, start: v("start"), end: v("end"), time: v("time"), location: v("location"), owner: v("owner"), asana: v("asana"), notes: v("notes") };
     if (!ev.title) return msg("Add a title.");
     if (!program) return msg("Choose a program.");
     if (!isDate(ev.start) || !ev.start.startsWith("2027")) return msg("Choose a start date in 2027.");
