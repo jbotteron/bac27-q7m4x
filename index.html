@@ -22,6 +22,8 @@
 :root.wallpaper { --safe-top: 56px; --safe-bottom: 96px; --icons: 230px; }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
+:root.wallpaper:not(.size-medium):not(.size-small) .desk { right: auto; bottom: auto;
+  width: calc((100vw - var(--icons) - 64px) * 0.92); height: calc((100vh - var(--safe-top) - var(--safe-bottom)) * 0.95); }
 :root.size-medium .desk { right: auto; bottom: auto; width: min(1120px, 70vw); height: min(78vh, 820px); }
 :root.size-small .desk { right: auto; bottom: auto; width: min(820px, 58vw); height: auto; grid-template-rows: auto auto; }
 :root.size-small .year { padding: 16px 18px 12px; }
@@ -32,12 +34,7 @@
 :root.size-small .brand { display: none; }
 :root.size-small .side { grid-template-columns: 1fr; }
 html, body { height: 100%; margin: 0; }
-body { font-family: var(--font); color: var(--white); overflow: hidden; background: var(--dark);
-  background-image:
-    radial-gradient(70% 60% at 12% 8%, rgba(46,52,134,0.95) 0%, rgba(46,52,134,0) 70%),
-    radial-gradient(55% 50% at 88% 92%, rgba(61,231,231,0.13) 0%, rgba(61,231,231,0) 70%),
-    radial-gradient(40% 35% at 70% 10%, rgba(61,231,231,0.07) 0%, rgba(61,231,231,0) 70%); }
-.bar { position: fixed; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, var(--light), var(--blue)); z-index: 5; }
+body { font-family: var(--font); color: var(--white); overflow: hidden; background: #000000; }
 .desk { position: absolute; inset: var(--safe-top) calc(var(--icons) + max(32px, env(safe-area-inset-right, 0px))) var(--safe-bottom) max(32px, env(safe-area-inset-left, 0px));
   display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 18px; }
 .widget { background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 22px;
@@ -45,9 +42,9 @@ body { font-family: var(--font); color: var(--white); overflow: hidden; backgrou
   backdrop-filter: blur(22px) saturate(1.2); -webkit-backdrop-filter: blur(22px) saturate(1.2); min-width: 0; min-height: 0; }
 
 /* Year widget */
-.year { display: flex; flex-direction: column; padding: 20px 22px 16px; }
+.year { display: flex; flex-direction: column; padding: 18px 22px 14px; overflow: hidden; }
 .year-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding: 0 2px 14px; }
-h1 { margin: 0; font-weight: 800; font-size: 26px; letter-spacing: -0.2px; line-height: 1; }
+h1 { margin: 0; white-space: nowrap; font-weight: 800; font-size: 26px; letter-spacing: -0.2px; line-height: 1; }
 h1 .yr { color: var(--light); margin-left: 8px; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; font-weight: 600; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -151,7 +148,6 @@ fieldset { border: 0; margin: 0; padding: 0; }
 </style>
 </head>
 <body>
-<div class="bar"></div>
 <main class="desk">
   <section class="widget year" aria-label="2027 calendar">
     <div class="year-head">
@@ -238,7 +234,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
   const m0 = SMALL && now.getFullYear() === Y ? Math.min(now.getMonth(), 9) : 0;
   const SHOW = SMALL ? [m0, m0 + 1, m0 + 2] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   grid.style.gridTemplateColumns = `52px repeat(${COLS}, minmax(0, 1fr))`;
-  grid.style.gridTemplateRows = `repeat(${SHOW.length}, minmax(${SMALL ? 44 : 30}px, 1fr))`;
+  grid.style.gridTemplateRows = `repeat(${SHOW.length}, minmax(${SMALL ? 44 : 24}px, 1fr))`;
   const SHORT = { "Juneteenth (obs.)": "Juneteenth", "July 4 (obs.)": "July 4", "Christmas Eve (obs.)": "Christmas Eve", "Christmas (obs.)": "Christmas", "Day after Thanksgiving": "Day after", "Indigenous Peoples Day": "Indigenous Peoples" };
   function holLabel(m, d) {
     if (!HOLIDAYS[key(m, d)] || (d > 1 && HOLIDAYS[key(m, d - 1)])) return "";
