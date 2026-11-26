@@ -53,6 +53,7 @@ h1 .yr { color: var(--light); margin-left: 8px; }
 .grid { flex: 1; min-height: 0; display: grid; position: relative; }
 .mon { font-weight: 800; font-size: 11.5px; letter-spacing: 1.6px; text-transform: uppercase; color: rgba(255,255,255,0.82); align-self: start; padding-top: 6px; border-top: 1px solid var(--line2); }
 .mon.first, .cell.first-row { border-top: 0; }
+.mon small { font-size: 8px; letter-spacing: 0.5px; font-weight: 700; color: var(--muted); margin-left: 3px; }
 .cell { position: relative; border: 0; border-top: 1px solid var(--line2); box-shadow: inset 1px 0 0 var(--line); background: transparent; padding: 0; margin: 0;
   color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .cell:hover { background: rgba(61,231,231,0.07); }
@@ -181,14 +182,19 @@ fieldset { border: 0; margin: 0; padding: 0; }
   // Google Apps Script web app URL (set after deploying gas/Code.gs). Empty = holidays only.
   const API = "https://script.google.com/macros/s/AKfycbwlw_7w5zpqdK1USClSLgQFGb8pR8WNk-P4B-64UtNOa9yYucyry2wv4sWfPHGuBH5F9Q/exec";
   const Y = 2027, COLS = 31;
+  // Rows shown: December 2026, then January to December 2027.
+  const ROWS = [{ y: 2026, m: 11 }].concat(Array.from({ length: 12 }, (_, m) => ({ y: 2027, m })));
+  const FIRST = "2026-12-01", LAST = "2027-12-31";
   const PROGRAMS = {
     k12:         { label: "K12",         color: "#4F58D9", ink: "#FFFFFF" },
     certificate: { label: "Certificate", color: "#3DE7E7", ink: "#202046" },
     college:     { label: "College",     color: "#A9AEF5", ink: "#202046" },
-    established: { label: "Established", color: "#E04E53", ink: "#FFFFFF" }
+    established: { label: "Established", color: "#E04E53", ink: "#FFFFFF" },
+    internal:    { label: "Internal",    color: "#E6E6E6", ink: "#202046" }
   };
-  // TechBuffalo paid holidays 2027 (Employee Manual, April 2024, section 3-4). Floating holiday not shown.
+  // TechBuffalo paid holidays, Dec 2026 and 2027 (Employee Manual, April 2024, section 3-4). Floating holiday not shown.
   const HOLIDAYS = {
+    "2026-12-24": "Christmas Eve", "2026-12-25": "Christmas", "2026-12-31": "New Year's Eve",
     "2027-01-01": "New Year's Day", "2027-01-18": "MLK Day", "2027-02-15": "Presidents Day",
     "2027-05-31": "Memorial Day", "2027-06-18": "Juneteenth (obs.)", "2027-07-05": "July 4 (obs.)",
     "2027-09-06": "Labor Day", "2027-10-11": "Indigenous Peoples Day", "2027-11-11": "Veterans Day",
@@ -198,8 +204,8 @@ fieldset { border: 0; margin: 0; padding: 0; }
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const DOW = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
   const pad = n => String(n).padStart(2, "0");
-  const key = (m, d) => `${Y}-${pad(m + 1)}-${pad(d)}`;
-  const dim = m => new Date(Y, m + 1, 0).getDate();
+  const key = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const dim = (y, m) => new Date(y, m + 1, 0).getDate();
   const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const fmt = (s, o) => parse(s).toLocaleDateString("en-US", o);
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -237,35 +243,37 @@ fieldset { border: 0; margin: 0; padding: 0; }
   // Year grid
   const grid = $("grid"), layers = [];
   const SMALL = MODE.endsWith("-small");
-  const m0 = SMALL && now.getFullYear() === Y ? Math.min(now.getMonth(), 9) : 0;
-  const SHOW = SMALL ? [m0, m0 + 1, m0 + 2] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const nowRow = ROWS.findIndex(r => r.y === now.getFullYear() && r.m === now.getMonth());
+  const r0 = SMALL ? Math.min(Math.max(nowRow, 0), ROWS.length - 3) : 0;
+  const SHOW = SMALL ? ROWS.slice(r0, r0 + 3) : ROWS;
   grid.style.gridTemplateColumns = `52px repeat(${COLS}, minmax(0, 1fr))`;
   grid.style.gridTemplateRows = `repeat(${SHOW.length}, minmax(${SMALL ? 44 : 24}px, 1fr))`;
   const SHORT = { "Juneteenth (obs.)": "Juneteenth", "July 4 (obs.)": "July 4", "Christmas Eve (obs.)": "Christmas Eve", "Christmas (obs.)": "Christmas", "Day after Thanksgiving": "Day after", "Indigenous Peoples Day": "Indigenous Peoples" };
-  function holLabel(m, d) {
-    if (!HOLIDAYS[key(m, d)] || (d > 1 && HOLIDAYS[key(m, d - 1)])) return "";
-    const labels = []; for (let x = d; x <= dim(m) && HOLIDAYS[key(m, x)]; x++) labels.push(SHORT[HOLIDAYS[key(m, x)]] || HOLIDAYS[key(m, x)]);
+  function holLabel(y, m, d) {
+    if (!HOLIDAYS[key(y, m, d)] || (d > 1 && HOLIDAYS[key(y, m, d - 1)])) return "";
+    const labels = []; for (let x = d; x <= dim(y, m) && HOLIDAYS[key(y, m, x)]; x++) labels.push(SHORT[HOLIDAYS[key(y, m, x)]] || HOLIDAYS[key(y, m, x)]);
     // Grid label for a run of holidays. Christmas Eve + Christmas shortens to "Christmas" so it clears New Year's Eve; the day panel keeps full names.
     const RUN = { "Christmas Eve · Christmas": "Christmas" };
     const text = RUN[labels.join(" · ")] || labels.join(" · ");
     return `<span class="hol-label${d + labels.length - 1 >= 28 && labels.length === 1 ? " r" : ""}">${esc(text)}</span>`;
   }
-  SHOW.forEach((m, ri) => {
+  SHOW.forEach(({ y, m }, ri) => {
     const r = ri + 1;
     const lab = document.createElement("div");
     lab.className = "mon" + (ri === 0 ? " first" : ""); lab.style.gridRow = r; lab.style.gridColumn = 1; lab.textContent = MONTHS[m];
+    if (y !== Y || (m === 0 && ROWS[0].y !== Y)) { const yr = document.createElement("small"); yr.textContent = "\u2019" + String(y).slice(2); lab.appendChild(yr); }
     grid.appendChild(lab);
-    for (let d = 1; d <= dim(m); d++) {
-      const k = key(m, d), c = document.createElement("button");
+    for (let d = 1; d <= dim(y, m); d++) {
+      const k = key(y, m, d), c = document.createElement("button");
       c.type = "button"; c.dataset.date = k;
       c.className = "cell" + (ri === 0 ? " first-row" : "") + (HOLIDAYS[k] ? " off" : "") + (k === todayKey ? " today" : "");
       c.style.gridRow = r; c.style.gridColumn = d + 1;
       c.setAttribute("aria-label", fmt(k, { weekday: "long", month: "long", day: "numeric" }) + (HOLIDAYS[k] ? ", " + HOLIDAYS[k] : ""));
-      c.innerHTML = `<span class="h"><span class="n">${d}</span><span class="d" data-l="${DOW[new Date(Y, m, d).getDay()]}">${DOW[new Date(Y, m, d).getDay()]}</span></span>` + holLabel(m, d);
+      c.innerHTML = `<span class="h"><span class="n">${d}</span><span class="d" data-l="${DOW[new Date(y, m, d).getDay()]}">${DOW[new Date(y, m, d).getDay()]}</span></span>` + holLabel(y, m, d);
       grid.appendChild(c);
     }
     const layer = document.createElement("div");
-    layer.className = "layer"; layer.style.gridRow = r; layer.style.gridColumn = `2 / span ${COLS}`; layer.dataset.m = m;
+    layer.className = "layer"; layer.style.gridRow = r; layer.style.gridColumn = `2 / span ${COLS}`; layer.dataset.m = m; layer.dataset.y = y;
     grid.appendChild(layer); layers.push(layer);
   });
   grid.addEventListener("click", e => {
@@ -284,18 +292,17 @@ fieldset { border: 0; margin: 0; padding: 0; }
       if (!isDate(e.start)) continue;
       const p = PROGRAMS[e.program] ? e.program : "established", dl = e.type === "deadline";
       for (let d = parse(e.start), end = parse(endOf(e)); d <= end; d.setDate(d.getDate() + 1)) {
-        if (d.getFullYear() !== Y) continue;
-        const k = `${Y}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        const k = key(d.getFullYear(), d.getMonth(), d.getDate());
         const o = ((day[k] = day[k] || {})[p] = day[k][p] || { ev: false, dl: false });
         if (dl) o.dl = true; else o.ev = true;
       }
     }
     layers.forEach(layer => {
-      const m = +layer.dataset.m;
+      const m = +layer.dataset.m, y = +layer.dataset.y;
       layer.textContent = "";
       const W = layer.clientWidth, H = layer.clientHeight, colW = W / COLS, TOP = 16;
-      for (let d = 1; d <= dim(m); d++) {
-        const k = key(m, d), info = day[k];
+      for (let d = 1; d <= dim(y, m); d++) {
+        const k = key(y, m, d), info = day[k];
         if (!info) continue;
         const blk = document.createElement("div"); blk.className = "fill";
         blk.style.left = ((d - 1) * colW + 1) + "px"; blk.style.width = Math.max(4, colW - 2) + "px";
@@ -312,9 +319,9 @@ fieldset { border: 0; margin: 0; padding: 0; }
   }
   let rT; window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(renderEvents, 80); });
 
-  // Up next widget: next program dates from today (or from Jan 1, 2027)
+  // Up next widget: next program dates from today (or from the first month shown)
   function renderNext() {
-    const from = todayKey > `${Y}-01-01` ? todayKey : `${Y}-01-01`;
+    const from = todayKey > FIRST ? todayKey : FIRST;
     const items = S.events.filter(e => isDate(e.start) && endOf(e) >= from).map(e => ({ type: "ev", date: e.start < from ? from : e.start, e }));
     const hol = Object.keys(HOLIDAYS).find(k => k >= from);
     if (hol) items.push({ type: "hol", date: hol });
@@ -428,8 +435,8 @@ fieldset { border: 0; margin: 0; padding: 0; }
         <label>Title<input id="f-title" name="title" maxlength="120" value="${esc(e.title)}" autofocus></label>
         <fieldset><legend>Program</legend><div class="chips">${chips}</div></fieldset>
         <fieldset><legend>Type</legend><div class="chips">${[["event", "Event"], ["deadline", "Deadline"]].map(([k, l]) => `<label class="chip"><input type="radio" name="type" value="${k}"${(e.type || "event") === k ? " checked" : ""}><span style="background:rgba(255,255,255,0.12);color:#FFFFFF">${l}</span></label>`).join("")}</div></fieldset>
-        <div class="two"><label>Start<input id="f-start" name="start" type="date" min="2027-01-01" max="2027-12-31" value="${esc(e.start)}"></label>
-        <label>End<input id="f-end" name="end" type="date" min="2027-01-01" max="2027-12-31" value="${esc(e.end || "")}"></label></div>
+        <div class="two"><label>Start<input id="f-start" name="start" type="date" min="${FIRST}" max="${LAST}" value="${esc(e.start)}"></label>
+        <label>End<input id="f-end" name="end" type="date" min="${FIRST}" max="${LAST}" value="${esc(e.end || "")}"></label></div>
         <label>Time<input id="f-time" name="time" maxlength="60" placeholder="10:00 AM – 5:00 PM" value="${esc(e.time)}"></label>
         <label>Location<input id="f-location" name="location" maxlength="160" value="${esc(e.location)}"></label>
         <label>Owner<input id="f-owner" name="owner" maxlength="80" value="${esc(e.owner)}"></label>
@@ -449,7 +456,8 @@ fieldset { border: 0; margin: 0; padding: 0; }
     const ev = { id: existing?.id || "", type: f.querySelector('input[name="type"]:checked')?.value || "event", title: v("title"), program, start: v("start"), end: v("end"), time: v("time"), location: v("location"), owner: v("owner"), asana: v("asana"), notes: v("notes") };
     if (!ev.title) return msg("Add a title.");
     if (!program) return msg("Choose a program.");
-    if (!isDate(ev.start) || !ev.start.startsWith("2027")) return msg("Choose a start date in 2027.");
+    if (!isDate(ev.start) || ev.start < FIRST || ev.start > LAST) return msg("Choose a start date between Dec 1, 2026 and Dec 31, 2027.");
+    if (ev.end && ev.end > LAST) return msg("The end date has to be on or before Dec 31, 2027.");
     if (ev.end && (!isDate(ev.end) || ev.end < ev.start)) return msg("The end date has to be on or after the start date.");
     if (ev.end === ev.start) ev.end = "";
     if (ev.asana && !safeUrl(ev.asana)) return msg("The Asana link has to start with https://");
